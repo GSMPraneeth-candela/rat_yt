@@ -57,16 +57,10 @@ class YouTube(object):
         except Exception as e:
             logger.error(f"Failed to simulate mouse movements: {e}")
 
-    def get_video_id(self):
-        return self.url.split("=")[1]
-
     def load_video(self):
-        # Wait for any extension popups like AdGuard "Thank you" pages to open
-        time.sleep(3)
-
-        self.page.bring_to_front()
         logger.info(f"Loading URL: {self.url}")
         self.page.goto(self.url, wait_until="domcontentloaded")
+        self.page.bring_to_front()
         return True
 
     def check_stop_signal(self):
@@ -137,8 +131,10 @@ class YouTube(object):
         movie_player.click(button="right")
         try:
             self.page.locator(".ytp-menuitem").nth(7).click()
+            logger.info("Stats for nerds enabled")
             return True
         except Exception:
+            logger.error("Failed to enable stats for nerds")
             return False
 
     def get_stats(self):
@@ -202,8 +198,10 @@ class YouTube(object):
         movie_player.click(button="right")
         try:
             self.page.locator(".ytp-menuitem").first.click()
+            logger.info("Loop enabled")
             return True
         except Exception:
+            logger.error("Failed to enable loop")
             return False
 
     def full_screen(self):
@@ -214,20 +212,16 @@ class YouTube(object):
 
     def play(self):
         if not self.load_video():
-            self.stop()
             return
         self.simulate_human_movements()
 
         if not self.enable_stats():
-            self.stop()
             return
         if self.duration:
             if not self.enable_loop():
-                self.stop()
                 return
 
         if not self.select_resolution():
-            self.stop()
             return
 
         self.video_duration = self.get_video_duration()
@@ -430,6 +424,10 @@ Example:
     )
     yt.play()
 
+    browser.close()
+    logger.info("Browser closed successfully.")
+    playwright.stop()
+    logger.info("Playwright stopped successfully.")
 
 if __name__ == "__main__":
     main()
