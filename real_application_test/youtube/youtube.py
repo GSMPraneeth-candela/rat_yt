@@ -8,7 +8,6 @@ import re
 import random
 import platform
 import logging
-import tempfile
 
 from playwright.sync_api import sync_playwright
 
@@ -68,7 +67,7 @@ class YouTube(object):
         try:
             endpoint_url = f"http://{self.host}:5002/check_stop"
 
-            response = requests.get(endpoint_url, timeout=3)
+            response = requests.get(endpoint_url)
             if response.status_code == 200:
 
                 stop_signal_from_server = response.json().get("stop", False)
@@ -90,7 +89,6 @@ class YouTube(object):
         time.sleep(0.2)
         sb = self.page.locator(".ytp-button.ytp-settings-button")
         sb.click()
-        time.sleep(0.3)
         try:
             res = self.page.locator(".ytp-menuitem-label").all()
             for item in res:
@@ -99,7 +97,6 @@ class YouTube(object):
                     break
         except Exception:
             logger.warning("Quality menu item not found in player settings.")
-        time.sleep(0.3)
         try:
             res = self.page.locator(".ytp-menuitem-label").all()
             logger.debug(f"Available resolution menu items: {res}")
@@ -122,7 +119,7 @@ class YouTube(object):
             return False
 
     def enable_stats(self):
-        self.page.wait_for_selector("#movie_player", timeout=60000)
+        self.page.wait_for_selector("#movie_player")
 
         movie_player = self.page.locator("#movie_player")
 
@@ -279,8 +276,8 @@ class YouTube(object):
                 self.send_stats_to_api(stats, self.device_name)
                 time.sleep(1)
             stats = self.get_stats()
-            self.dataset.append(stats)
-            self.send_stats_to_api(stats, self.device_name, stop=True)
+            self.dataset.append(stats, self.device_name)
+            self.send_stats_to_api(stats, stop=True)
 
         logger.info("Playback finished.")
         self.stop()
@@ -309,7 +306,7 @@ class YouTube(object):
                 "stop": stop,  # Stop remains as a separate key
             }
 
-            response = requests.post(url, json=data, headers=headers, timeout=3)
+            response = requests.post(url, json=data, headers=headers)
             if response.status_code == 200:
                 logger.info("Stats sent to API successfully.")
             else:
@@ -385,7 +382,7 @@ Example:
     local_adguard = os.path.join(os.path.dirname(os.path.abspath(__file__)), "adguard")
     if os.path.exists(local_adguard):
         adguard_path = local_adguard
-    elif platform.system() == "Windows":
+    if platform.system() == "Windows":
         adguard_path = os.path.join(
             "C:\\", "Program Files (x86)", "LANforge-Server", "adguard"
         )
@@ -396,22 +393,20 @@ Example:
     else:
         raise Exception("Unsupported OS")
 
-    user_data_dir = tempfile.mkdtemp()
-
     playwright = sync_playwright().start()
 
-    browser = playwright.chromium.launch_persistent_context(
-        user_data_dir,
+    browser = playwright.chromium.launch(
         headless=False,
         args=[
             f"--disable-extensions-except={adguard_path}",
             f"--load-extension={adguard_path}",
             "--no-sandbox",
             "--disable-blink-features=AutomationControlled",
+            "--start-maximized",
         ],
     )
-
-    page = browser.pages[0] if browser.pages else browser.new_page()
+    context = browser.new_context(viewport=None)
+    page = context.pages[0] if context.pages else context.new_page()
 
     yt = YouTube(
         args.url,
